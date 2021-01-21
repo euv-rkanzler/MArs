@@ -83,7 +83,7 @@ function dump_database()
     print("<table><tr><th>date</th><th>pl</th><th>uid</th></tr>");
     while ($reservation = $result->fetch_assoc()) {
         $date = $reservation['date'];
-        $text = $reservation['text'];
+        $text = AREAS[$reservation['text']]['name'];
         $uid = $reservation['name'];
         print("<tr><td>$date</td><td>$text</td><td>$uid</td></tr>");
     }
@@ -170,8 +170,20 @@ function update_database($uid, $is_member, $date, $oldvalue, $value)
     $table = DB_TABLE;
     $comment = "";
     $no_reservation = 'no';
-    $success_text = '<span class="success">Aktion erfolgreich</span>';
-    $failure_text = '<span class="failure">Aktion nicht erfolgreich</span>';
+    $success_text = '<div class="row">
+                        <div class="col s12">
+                            <div class="card-panel light-green">
+                                <span class="white-text">Aktion erfolgreich</span>
+                            </div>
+                        </div>
+                    </div>';
+    $failure_text = '<div class="row">
+                        <div class="col s12">
+                            <div class="card-panel pink lighten-1">
+                                <span class="white-text">Aktion nicht erfolgreich</span>
+                            </div>
+                        </div>
+                    </div>';
     if ($value == $no_reservation) {
         // Delete booking.
         $result = $db->query("DELETE FROM $table WHERE name='$uid' AND date='$date'");
@@ -188,14 +200,26 @@ function update_database($uid, $is_member, $date, $oldvalue, $value)
         if ($url_tstamp) {
             $today = date('Y-m-d', $url_tstamp);
         }
-        $result = $db->query("SELECT COUNT(*) FROM $table WHERE date>'$today' AND name='$uid'");
+        $result = $db->query("SELECT COUNT(*) FROM $table WHERE date>='$today' AND name='$uid'");
         $personal_bookings = $result ? $result->fetch_row()[0] : 999;
         if ($count >= $limit) {
-            $comment = '<span class="failure">Bibliotheksbereich ausgebucht</span>';
+            $comment ='<div class="row">
+                            <div class="col s12">
+                                <div class="card-panel pink lighten-1">
+                                    <span class="white-text">Bibliotheksbereich ausgebucht</span>
+                                </div>
+                            </div>
+                        </div>';
         } elseif ($oldvalue == $no_reservation) {
             // New bookings.
             if ($personal_bookings >= PERSONAL_LIMIT[$group]) {
-                $comment = '<span class="failure">Persönliches Buchungslimit erreicht</span>';
+                $comment = '<div class="row">
+                                <div class="col s12">
+                                    <div class="card-panel pink lighten-1">
+                                        <span class="white-text">Persönliches Buchungslimit erreicht</span>
+                                    </div>
+                                </div>
+                            </div>';
             } else {
                 $result = $db->query("INSERT INTO $table (name, member, text, date) VALUES ('$uid',$member,'$value','$date')");
                 $success = $result ? $success_text : $failure_text;
@@ -204,7 +228,13 @@ function update_database($uid, $is_member, $date, $oldvalue, $value)
         } else {
             // Modified booking.
             if ($personal_bookings > PERSONAL_LIMIT[$group]) {
-                $comment = '<span class="failure">Persönliches Buchungslimit erreicht</span>';
+                $comment = '<div class="row">
+                                <div class="col s12">
+                                    <div class="card-panel pink lighten-1">
+                                        <span class="white-text">Persönliches Buchungslimit erreicht</span>
+                                    </div>
+                                </div>
+                            </div>';
             } else {
                 $result = $db->query("DELETE FROM $table WHERE name='$uid' AND date='$date'");
                 $result = $db->query("INSERT INTO $table (name, member, text, date) VALUES ('$uid',$member,'$value','$date')");
@@ -251,8 +281,7 @@ function show_database($uid, $lastuid, $is_member)
     // First day which will be shown.
     $first = $now;
 
-    print('<fieldset>');
-    print('<legend>Buchungen / bookings</legend>');
+    print('<div class=\"z-depth-1 grey lighten-4 row\" style=\"display: inline-block; padding: 32px 48px 0px 48px; border: 1px solid #EEE;\">');
 
     // Get the first reserved day from the booking list.
     $i = 0;
@@ -262,7 +291,7 @@ function show_database($uid, $lastuid, $is_member)
         $day = date('Y-m-d', $time);
         $text = 'no';
         if ($time < $start) {
-            $disabled = ' disabled';
+            $disabled = ' disabled="disabled"';
         }
 
         $label = date('d.m.', $time);
@@ -282,17 +311,17 @@ function show_database($uid, $lastuid, $is_member)
 
         // Skip days which cannot be booked.
         $weekday = date('D', $time);
-        $label = "<label><span class=\"weekday\">$weekday</span> $label</label>";
+
+        // Automated date formatting based on browsers locale
+        $fmt = datefmt_create(locale::acceptFromHttp($_SERVER['HTTP_ACCEPT_LANGUAGE']), IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'Europe/Berlin', IntlDateFormatter::GREGORIAN, 'EE dd.MM.');
+        $weekday_formatted = datefmt_format($fmt, $time);
+
+        $label = "<label class=\"col s3 black-text day\">$weekday_formatted</label>";
         $closed = false;
         foreach (CLOSED as $condition) {
-            $closed = ($weekday == $condition);
+            $closed = ($weekday == $condition || $day == $condition);
             if ($closed) {
-                print("<div class=\"closed\">$label geschlossen / closed</div>");
-                break;
-            }
-            $closed = ($day == $condition);
-            if ($closed) {
-                print("<div class=\"closed\">$label geschlossen / closed</div>");
+                print("<div class=\"closed row\">$label geschlossen / closed</div>");
                 break;
             }
         }
@@ -319,22 +348,28 @@ function show_database($uid, $lastuid, $is_member)
         foreach (AREAS as $area => $values) {
             $id = "$area-$day";
             $checked = ($text == $area) ? ' checked' : '';
-            $line .= "<input type=\"radio\" name=\"$name\" id=\"$id\" value=\"$area\"$checked$disabled/>" .
-                "<label class=\"$area\" for=\"$id\">" . $values['name'] . "</label>";
+            $line .="<label class=\"col s9 offset-s3 m3 black-text\">
+                        <input name=\"$name\" id=\"$id\" type=\"radio\" value=\"$area\"$checked$disabled />
+                        <span>" . $values['name'] . "</span>
+                    </label>"; 
+
         }
         $id = "no-$day";
         $checked = ($text == 'no') ? ' checked' : '';
-        $line .= "<input type=\"radio\" name=\"$name\" id=\"$id\" value=\"no\"$checked$disabled/>" .
-            "<label class=\"no\" for=\"$id\">Keine Buchung</label>";
+        $line .= "<label class=\"col offset-s3 s9 m3 black-text\">
+                    <input name=\"$name\" id=\"$id\" type=\"radio\" value=\"no\"$checked$disabled />
+                    <span>Keine Buchung</span>
+                </label>"; 
+
         if ($comment != '') {
             $comment = " $comment";
         }
-        print("<div class=\"open\">$label$line$comment</div>\n");
+        print("<div class=\"open row\">$label$line$comment</div>\n");
     }
-    print('</fieldset>');
+    print('</div>');
 
     $today = date('Y-m-d', $now);
-    $result = $db->query("SELECT COUNT(*) FROM $table WHERE date>'$today' AND name='$uid'");
+    $result = $db->query("SELECT COUNT(*) FROM $table WHERE date>='$today' AND name='$uid'");
     $personal_bookings = $result ? $result->fetch_row()[0] : 999;
     $db->close();
     $group = $user['is_member'] ? "member" : "extern";
@@ -361,7 +396,7 @@ function day_report($location = false)
 
     if (!$location) {
         // Summary of daily bookings per location.
-        $result = $db->query("SELECT date, text, SUM(member) AS internal, SUM(NOT member) AS external FROM seatbookings GROUP BY date, text");
+        $result = $db->query("SELECT date, text, SUM(member) AS internal, SUM(NOT member) AS external FROM $table GROUP BY date, text");
         $reservations = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
         $db->close();
@@ -471,37 +506,25 @@ $user = array(
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <title>UB Sitzplatzbuchung</title>
+<!--Import Google Icon Font-->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<!--Import materialize.css-->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
 <link rel="stylesheet" type="text/css" href="mars.css" media="all">
 </head>
 <body>
+<br/>
+<div class="container">
+<div class="row center">
+<form class="col s12" id="reservation" method="post">
 <?php
 if ($uid != '') {
     $authorized = get_authorization($uid, htmlspecialchars_decode($password));
 }
 
-if ($uid == '' || $task == '') {
-    ?>
-<form id="reservation" method="post">
-
-<fieldset class="personaldata">
-<legend>Benutzerdaten / personal data</legend>
-<label class="uid" for="uid">Uni-ID:*</label>
-<input class="uid" id="uid" name="uid" placeholder="uni id" maxlength="8"
-  pattern="^([a-z_0-9]{0,8})$" required="required" value="<?=$uid?>"/>
-<label class="password" for="password">Passwort:*</label><input id="password" name="password" placeholder="********" required="required" type="password" value="<?=$password?>"/>
-<input id="lastuid" name="lastuid" type="hidden" value="<?=$authorized ? $uid : ''?>"/>
-</fieldset>
-    <?php
-}
-
-if ($authorized && $task == '') {
-    ?>
-<button class="logout" type="button"><a class="logout" href=".">Abmelden / Logout</a></button>
-    <?php
-}
 
 // Should admin commands be allowed?
 $master = ($authorized === 'master');
@@ -560,60 +583,85 @@ if ($master && $task == 'dump') {
     } else {
         print('<p>Die Anmeldedaten sind ungültig. Bitte prüfen Sie Uni-ID und Passwort.</p>');
     }
-} else {
-    ?>
-    <p>Die <a href="/datenschutzerklaerung/" target="_blank">Informationen zum Datenschutz</a> wurden mir zur Verfügung gestellt.<br/>
-    The <a href="/en/privacy-policy/" target="_blank">privacy information</a> was provided to me.</p>
-    <?php
-}
+} 
 //<button type="reset">Eingaben zurücksetzen</button>
 
-if ($uid == '' || $task == '') {
     if ($authorized) {
-        ?>
-<button class="submit" type="submit">Eingaben absenden</button>
+        if ($task == '') {
+?>
+<button class="waves-effect waves-light btn submit" type="submit">Eingaben absenden</button>
 <br/>
-<input type="checkbox" name="email" id="email" value="checked" <?=$email?>/>
-<label for="email">Informieren Sie mich bitte per E-Mail über meine aktuellen Sitzplatzbuchungen.
-Please inform me by e-mail about my current bookings.</label>
-        <?php
+<label>
+    <input type="checkbox" class="filled-in" name="email" id="email" checked="checked" <?=$email?>/>
+    <span>Informieren Sie mich bitte per E-Mail über meine aktuellen Sitzplatzbuchungen. / Please inform me by e-mail about my current bookings.</span>
+</label>
+<?php 
+        }
+?>
+<input id="uid" name="uid" type="hidden" value="<?=$uid?>"/>
+<input id="lastuid" name="lastuid" type="hidden" value="<?=$authorized ? $uid : ''?>"/>
+<input id="password" name="password" type="hidden" value="<?=$password?>"/>
+<br/>
+<div class='row'>
+    <a class="waves-effect waves-light btn logout" href="./index.php">Abmelden / Logout<i class="material-icons right">logout</i></a>
+</div>
+<?php
     } else {
-        ?>
-<button class="submit" type="submit">Anmelden</button>
-        <?php
+?>
+        <div class="z-depth-1 grey lighten-4 row" style="display: inline-block; padding: 32px 48px 0px 48px; border: 1px solid #EEE;">
+            <!-- <div class="row">
+                <p>Benutzerdaten / personal data<p>
+            </div> -->
+            <div class='row'>
+                <div class='input-field col s6'>
+                    <input class="validate" id="uid" name="uid" data-length="10" type="text" required="required" value="<?=$uid?>"/>
+                    <label for="uid">Uni-ID:*</label>
+                </div>
+                <div class='input-field col s6'>
+                    <input id="lastuid" name="lastuid" type="hidden" value="<?=$authorized ? $uid : ''?>"/>
+                    <input class="validate" id="password" name="password" required="required" type="password" value="<?=$password?>"/>
+                    <label for="password">Passwort:*</label>
+                </div>
+            </div>  
+            <div class="row">
+                <button class="waves-effect waves-light btn submit col s6 offset-s3" type="submit">Anmelden<i class="material-icons right">login</i></button>
+            </div>
+        </div>
+        <!-- <div class="row">
+            <p>Die <a href="/datenschutzerklaerung/" target="_blank">Informationen zum Datenschutz</a> wurden mir zur Verfügung gestellt.<br/>
+            The <a href="/en/privacy-policy/" target="_blank">privacy information</a> was provided to me.</p>
+        </div> -->
+<?php
     }
-    ?>
-
-    <?php
     if ($master) {
-        ?>
+?>
 <h3>Admin-Funktionen</h3>
 <p>
 <ul>
-<li><a href="./?task=dump" target="_blank">Alle Buchungen ausgeben</a>
-<li><a href="./?task=day-report" target="_blank">Buchungsübersicht</a>
+<li><a href="?task=dump" target="_blank">Alle Buchungen ausgeben</a>
+<li><a href="?task=day-report" target="_blank">Buchungsübersicht</a>
 <?php
 foreach (AREAS as $key => $values) {
-    print("<li><a href='./?task=$key-report' target='_blank'>Tagesplanung " . $values['name'] . "</a>");
+    print("<li><a href='?task=$key-report' target='_blank'>Tagesplanung " . $values['name'] . "</a>");
 }
 ?>
 </ul>
 </p>
-        <?php
+<?php
     }
-    ?>
-
-</form>
-
-    <?=HINTS?>
-    <?php
-}
+?>
+<?=HINTS?>
+<?php
 
 // Include JS
+print('<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>');
+
 if (file_exists("$confdir/local.js")) {
     print("<script type='text/javascript' src='.$localdir/local.js'></script>");
 }
 ?>
-
+</form>
+</div> <!-- row-center -->
+</div> <!-- container -->
 </body>
 </html>
