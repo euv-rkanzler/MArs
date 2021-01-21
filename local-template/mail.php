@@ -16,7 +16,16 @@ function sendmail($user, $text) {
     $text = "Diese Reservierungen sind für die Benutzerkennung " . $user['id'] . " vorgemerkt:\n\nDatum      Bibliotheksbereich\n" . $text;
 
     // Sendmail for transport.
-    $transport = new Swift_SendmailTransport('/usr/sbin/sendmail -bs');
+    if (MAIL_TRANSPORT == 'sendmail') {
+        $transport = new Swift_SendmailTransport('/usr/sbin/sendmail -bs');
+    }
+
+    // SMTP for transport.
+    if (MAIL_TRANSPORT == 'smtp') {
+        $transport = (new Swift_SmtpTransport(SMTP_SERVER, SMTP_PORT))
+            ->setUsername(SMTP_USER)
+            ->setPassword(SMTP_PASSWORD);
+    }
 
     // Create the Mailer using your created Transport
     $mailer = new Swift_Mailer($transport);

@@ -119,6 +119,11 @@ define('TRACE_USER', '');
 // Mail
 // ====================
 
+define('MAIL_TRANSPORT', 'sendmail'); // sendmail or smtp
+define('SMTP_SERVER', 'localhost');
+define('SMTP_PORT', 25);
+define('SMTP_USER', 'smtp-user');
+define('SMTP_PASSWORD', 'smtp-password');
 define('FROM_MAIL', ['user@example.org' => 'Demo Sender']);
 define('STAFF_TO_MAIL', 'staff@example.org');
 
