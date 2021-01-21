@@ -7,7 +7,7 @@
 // Include likely customized files
 // ====================
 
-require_once 'auth.php';
+require_once 'auth-ldap.php';
 require_once 'mail.php';
 
 // ====================
@@ -19,6 +19,18 @@ define('DB_NAME', 'MyDbName');
 define('DB_TABLE', 'MyDbTable');
 define('DB_USER', 'MyDbUser');
 define('DB_PASS', 'MyDbPass');
+
+// ====================
+// LDAP settings
+// ====================
+
+define('LDAP_ADDRESS', 'ldap://localhost');
+define('LDAP_BIND_USER', 'bind-user');
+define('LDAP_BIND_PASSWORD', 'bind-password');
+define('LDAP_PORT', '389');
+define('LDAP_DOMAIN', 'company');
+define('LDAP_DN', 'dc=company,dc=local');
+define('LDAP_FILTER', "(&(objectCategory=person)(sAMAccountName=%s))");
 
 // ====================
 // Settings for seat booking.
@@ -69,6 +81,12 @@ define('PERSONAL_LIMIT', [
 // Booking can be restricted to certain groups of users.
 // E.g. you could use this array in auth.php to derive if a user is a member or not.
 define('USERGROUPS', [
+]);
+
+// LDAP users with master permission.
+define('USERADMIN', [
+	'admin1',
+	'admin2'
 ]);
 
 // ====================

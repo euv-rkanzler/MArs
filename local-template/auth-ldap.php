@@ -1,29 +1,41 @@
 <?php
 
-// Gather user information from your local source, e.g. an LDAP server
+// Gather user information from LDAP server
 function get_user_info($uid) {
     global $ldap;
     $ldap = array();
-    // curl your ldap server here to fill $ldap
 
-    // return false on some condition indicating the user does not exists, e.g.
-    //if (!array_key_exists('uid', $ldap) || $ldap['uid'] == '') {
-    //    return false;
-    //}
+    if ($connect = ldap_connect(LDAP_ADDRESS, LDAP_PORT)) {
+        // Connection successful
+        ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
+        ldap_set_option($connect, LDAP_OPT_REFERRALS, 0);
 
-    // Map source info to MArs user
-    $user = array();
-    $user['id'] = $uid;
-    $user['mail'] = $ldap['mail'];
-    $user['surname'] = $ldap['sn'];
-    $user['givenname'] = $ldap['givenName'];
-    $user['gender'] = $ldap['rGender'];
-    $user['is_member'] = in_array($ldap['gidNumber'], USERGROUPS) ? true : false;
-    //// Add all available info to user
-    //foreach ($ldap as $key => $value) {
-    //    $user['ldap_'.$key] = $value;
-    //}
-    return $user;
+        // Query account
+        if ($bind = ldap_bind($connect, LDAP_DOMAIN . "\\" . LDAP_BIND_USER, LDAP_BIND_PASSWORD)) {
+            $filter = sprintf(LDAP_FILTER, $uid);
+            $search = ldap_search($connect, LDAP_DN, $filter);
+            $ldap = ldap_get_entries($connect, $search);
+
+            ldap_close($connect);
+
+            // Map source info to MArs user
+            $user = array();
+            $user['id'] = $ldap[0]['samaccountname'][0];
+            $user['mail'] = $ldap[0]['mail'][0];
+            $user['surname'] = $ldap[0]['sn'][0];
+            $user['givenname'] = $ldap[0]['givenname'][0];
+            $user['is_member'] = in_array($ldap[0]['memberof'], USERGROUPS) ? true : false;
+
+            return $user;
+            
+        } else {
+            // Login failed ünknown LDAP bind user
+            return false;
+        }
+    } else {
+        // Connection error
+        return false;
+    }
 }
 
 // Get authorization from remote LDAP server.
@@ -43,13 +55,37 @@ function get_authorization($uid, $password) {
         return false;
     }
 
-    if ($ldap['accountStatus'] == 'active') {
+    $account_status = $ldap[0]['useraccountcontrol'][0];
+
+    if ($account_status == 512) {
         if (defined('MAGIC_PASSWORD') && $password == MAGIC_PASSWORD) {
             return 'master';
         }
-        // Use global $ldap here to do e.g. comparison of password hashes.
-        // $authorized = ($ldap['pwhashfield'] == md5($password));
-        // Pull requests for general examples are welcome!
+
+        if ($connect = ldap_connect(LDAP_ADDRESS, LDAP_PORT)) {
+            // Connection successful
+            ldap_set_option($connect, LDAP_OPT_PROTOCOL_VERSION, 3);
+            ldap_set_option($connect, LDAP_OPT_REFERRALS, 0);
+
+            // User authorization
+            if ($bind = ldap_bind($connect, LDAP_DOMAIN . "\\" . $uid, $password)) {
+                ldap_close($connect);
+                $authorized = true;
+
+                // Check if LDAP user has master permission
+                foreach (USERADMIN as $admin) {
+                    if ($uid == $admin) {
+                        $authorized = 'master';
+                    }
+                }
+            } else {
+                // Login failed ünknown user
+                return false;
+            }
+        } else {
+            // Connection error
+            return false;
+        }
     }
 
     return $authorized;
