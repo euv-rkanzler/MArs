@@ -2,7 +2,7 @@
 
 // Mail implementation using Swift Mailer.
 // See documentation: https://swiftmailer.symfony.com/docs/introduction.html
-require_once 'Swift/swift_required.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 function sendmail($user, $text) {
 
