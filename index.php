@@ -346,11 +346,22 @@ function show_database($uid, $lastuid, $is_member)
 
         $line = '';
         foreach (AREAS as $area => $values) {
+            // Get reservation count
+            $member = $is_member ? 1 : 0;
+            $result = $db->query("SELECT COUNT(*) FROM $table WHERE date='$day' AND text='$area' AND member=$member");
+            $count = $result ? $result->fetch_row()[0] : 0;
+            $result->free();
+            $group = $is_member ? "member" : "extern";
+            $limit = AREAS[$area]['limit'][$group];
+            $remain = $limit - $count;
+            $remain_color = ($remain == 0) ? " red" : " light-green";
+            
             $id = "$area-$day";
             $checked = ($text == $area) ? ' checked' : '';
             $line .="<label class=\"col s9 offset-s3 m3 black-text\">
                         <input name=\"$name\" id=\"$id\" type=\"radio\" value=\"$area\"$checked$disabled />
                         <span>" . $values['name'] . "</span>
+                        <span class='new badge $remain_color' data-badge-caption=''>$remain</span>
                     </label>"; 
 
         }
